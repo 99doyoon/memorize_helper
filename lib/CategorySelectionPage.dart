@@ -46,6 +46,34 @@ class _CategorySelectionPageState extends State<CategorySelectionPage> {
     _loadCategories();
   }
 
+  void _deleteCategory(String name) async {
+    // 사용자에게 경고 대화상자를 표시합니다.
+    bool confirm = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('카테고리 삭제'),
+          content: Text('$name 카테고리를 삭제하시겠습니까?'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('취소'),
+              onPressed: () => Navigator.of(context).pop(false),  // 취소 시 false 반환
+            ),
+            TextButton(
+              child: Text('삭제'),
+              onPressed: () => Navigator.of(context).pop(true),  // 삭제 시 true 반환
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm) {
+      await DatabaseHelper.instance.deleteCategory(name);  // 카테고리 삭제
+      _loadCategories();  // 카테고리 목록 갱신
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,7 +82,7 @@ class _CategorySelectionPageState extends State<CategorySelectionPage> {
         actions: <Widget>[
           IconButton(
             icon: Icon(Icons.add),
-            onPressed: _navigateToAddCategoryPage, // 수정된 부분
+            onPressed: _navigateToAddCategoryPage,
           ),
         ],
       ),
@@ -66,6 +94,10 @@ class _CategorySelectionPageState extends State<CategorySelectionPage> {
               itemBuilder: (context, index) {
                 return ListTile(
                   title: Text(_categories[index]),
+                  trailing: IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () => _deleteCategory(_categories[index]),  // 삭제 아이콘 클릭 시
+                  ),
                   onTap: () {
                     Navigator.push(
                       context,

@@ -25,11 +25,11 @@ class DatabaseHelper {
     const textType = 'TEXT NOT NULL';
 
     await db.execute('''
-CREATE TABLE categories (
-  id $idType,
-  name $textType
-)
-''');
+      CREATE TABLE categories (
+        id $idType,
+        name $textType
+      )
+      ''');
   }
 
   Future<void> addCategory(String name) async {
@@ -42,6 +42,17 @@ CREATE TABLE categories (
     final result = await db.query('categories');
 
     return result.map((json) => json['name'] as String).toList();
+  }
+
+  // 카테고리 삭제 메서드
+  Future<void> deleteCategory(String name) async {
+    final db = await instance.database;
+    // 'name' 열이 매개변수로 받은 이름과 일치하는 레코드를 삭제합니다.
+    await db.delete(
+      'categories',
+      where: 'name = ?',
+      whereArgs: [name],
+    );
   }
 
   Future close() async {
