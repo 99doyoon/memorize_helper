@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'database_helper.dart';
+import 'WordTestPage.dart';
 
 class AddWordPage extends StatefulWidget {
   final String category;
@@ -36,7 +37,7 @@ class _AddWordPageState extends State<AddWordPage> {
     }
 
     try {
-      await DatabaseHelper.instance.addWord(word, meaning);
+      await DatabaseHelper.instance.addWord(widget.category, word, meaning);
       _refreshWords();
       _wordController.clear();
       _meaningController.clear();
@@ -55,14 +56,14 @@ class _AddWordPageState extends State<AddWordPage> {
     }
   }
 
-  void _deleteWord(String word) async {
+  void _deleteWord(int wordId) async {
     try {
-      await DatabaseHelper.instance.deleteWord(word);
+      await DatabaseHelper.instance.deleteWord(widget.category, wordId);
       _refreshWords();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$word 단어가 삭제되었습니다.'),
+          content: Text('단어가 삭제되었습니다.'),
         ),
       );
     } catch (e) {
@@ -75,7 +76,7 @@ class _AddWordPageState extends State<AddWordPage> {
   }
 
   void _refreshWords() async {
-    List<Map<String, dynamic>> updatedWords = await DatabaseHelper.instance.getWords();
+    List<Map<String, dynamic>> updatedWords = await DatabaseHelper.instance.getWords(widget.category);
     setState(() {
       _words = updatedWords;
     });
@@ -85,7 +86,7 @@ class _AddWordPageState extends State<AddWordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('단어 추가/삭제'),
+        title: Text('${widget.category} 단어 추가/삭제'),
       ),
       body: Column(
         children: <Widget>[
@@ -119,11 +120,22 @@ class _AddWordPageState extends State<AddWordPage> {
                   subtitle: Text(word['meaning']),
                   trailing: IconButton(
                     icon: Icon(Icons.delete),
-                    onPressed: () => _deleteWord(word['word']),
+                    onPressed: () => _deleteWord(word['id']),
                   ),
                 );
               },
             ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // '단어 시험 시작' 버튼 클릭 시
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => WordTestPage(category: widget.category),
+                ),
+              );
+            },
+            child: Text('단어 시험 시작'),
           ),
         ],
       ),

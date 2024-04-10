@@ -16,141 +16,77 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-
-    // 데이터베이스 버전을 2로 업데이트합니다.
-    return await openDatabase(path, version: 2, onCreate: _createDB, onOpen: (db) {
-      db.execute('PRAGMA foreign_keys = ON');
-    }, onUpgrade: _onUpgrade); // onUpgrade 콜백 추가
+    return await openDatabase(path, version: 1, onCreate: _createDB);
   }
-
-// onUpgrade 콜백 구현
-  void _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // 1. 임시 테이블 생성 및 기존 데이터 복사
-      await db.execute('''
-      CREATE TEMPORARY TABLE words_backup(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        word TEXT NOT NULL,
-        meaning TEXT NOT NULL,
-        categoryId INTEGER
-      )
-    ''');
-      await db.execute('''
-      INSERT INTO words_backup SELECT id, word, meaning, categoryId FROM words
-    ''');
-      await db.execute('DROP TABLE words');
-
-      // 2. 새로운 FOREIGN KEY 제약 조건을 포함하여 원래 테이블 재생성
-      await db.execute('''
-      CREATE TABLE words (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        word TEXT NOT NULL,
-        meaning TEXT NOT NULL,
-        categoryId INTEGER,
-        FOREIGN KEY (categoryId) REFERENCES categories(id) ON DELETE CASCADE
-      )
-    ''');
-
-      // 3. 임시 테이블에서 데이터를 원래 테이블로 복사하고 임시 테이블 삭제
-      await db.execute('''
-      INSERT INTO words SELECT id, word, meaning, categoryId FROM words_backup
-    ''');
-      await db.execute('DROP TABLE words_backup');
-    }
-  }
-
 
   Future _createDB(Database db, int version) async {
     // 'categories' 테이블 생성
     await db.execute('''
       CREATE TABLE categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL
-      )
-    ''');
-
-    // 'words' 테이블 생성
-    await db.execute('''
-      CREATE TABLE words (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        word TEXT NOT NULL,
-        meaning TEXT NOT NULL,
-        categoryId INTEGER,
-        FOREIGN KEY (categoryId) REFERENCES categories(id) ON DELETE CASCADE
+        name TEXT NOT NULL UNIQUE
       )
     ''');
   }
 
-
   Future<void> addCategory(String name) async {
     final db = await instance.database;
-    await db.insert('categories', {'name': name});
+    await db.transaction((txn) async {
+      await txn.insert('categories', {'name': name});
+      // 카테고리에 따른 단어 테이블 생성
+      await txn.execute('''
+        CREATE TABLE ${name}_words (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          word TEXT NOT NULL,
+          meaning TEXT NOT NULL
+        )
+      ''');
+    });
+  }
+
+  Future<void> deleteCategory(String name) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'categories',
+        where: 'name = ?',
+        whereArgs: [name],
+      );
+      // 해당 카테고리의 단어 테이블 삭제
+      await txn.execute('DROP TABLE IF EXISTS ${name}_words');
+    });
   }
 
   Future<List<String>> getCategories() async {
     final db = await instance.database;
-    final result = await db.query('categories');
-
-    return result.map((json) => json['name'] as String).toList();
+    final result = await db.query('categories', columns: ['name']);
+    List<String> categories = result.map((c) => c['name'] as String).toList();
+    return categories;
   }
 
-  // 카테고리 삭제 메서드
-  Future<void> deleteCategory(String name) async {
+  Future<void> addWord(String categoryName, String word, String meaning) async {
     final db = await instance.database;
-
-    // 먼저, 삭제하려는 카테고리의 ID를 찾습니다.
-    final List<Map<String, dynamic>> categories = await db.query(
-      'categories',
-      columns: ['id'],
-      where: 'name = ?',
-      whereArgs: [name],
-    );
-
-    if (categories.isNotEmpty) {
-      final id = categories.first['id'];
-
-      // 찾은 ID를 가진 카테고리 삭제
-      // 연결된 'words' 테이블의 단어들도 자동으로 삭제됩니다. (ON DELETE CASCADE 설정 필요)
-      await db.delete(
-        'categories',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-    }
+    await db.insert('${categoryName}_words', {'word': word, 'meaning': meaning});
   }
 
-
-
-  Future<void> addWord(String word, String meaning) async {
+  Future<List<Map<String, dynamic>>> getWords(String categoryName) async {
     final db = await instance.database;
-    await db.insert('words', {'word': word, 'meaning': meaning});
-  }
-
-  Future<List<Map<String, dynamic>>> getWords() async {
-    final db = await instance.database;
-    final result = await db.query('words');
+    final result = await db.query('${categoryName}_words');
     return result;
   }
 
-  Future<void> deleteWord(String word) async {
+  Future<void> deleteWord(String categoryName, int wordId) async {
     final db = await instance.database;
     await db.delete(
-      'words',
-      where: 'word = ?',
-      whereArgs: [word],
+      '${categoryName}_words',
+      where: 'id = ?',
+      whereArgs: [wordId],
     );
   }
 
-  // 모든 단어를 가져오는 메서드
-  Future<List<Map<String, dynamic>>> getALLWords() async {
-    final db = await instance.database;
-    final result = await db.query('words');
-    return result;
-  }
 
   Future close() async {
     final db = await instance.database;
-
     db.close();
   }
 }
