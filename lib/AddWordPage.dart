@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 import 'database_helper.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path_provider/path_provider.dart';
-// 데이터베이스 헬퍼 클래스를 임포트해야 합니다.
-// import 'path_to_your_database_helper.dart';
 
 class AddWordPage extends StatefulWidget {
   final String category;
@@ -15,9 +11,10 @@ class AddWordPage extends StatefulWidget {
 }
 
 class _AddWordPageState extends State<AddWordPage> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _wordController = TextEditingController();
   final TextEditingController _meaningController = TextEditingController();
+
+  List<Map<String, dynamic>> _words = [];
 
   @override
   void dispose() {
@@ -26,66 +23,116 @@ class _AddWordPageState extends State<AddWordPage> {
     super.dispose();
   }
 
-  void _saveWord() async {
-    if (_formKey.currentState!.validate()) {
-      String word = _wordController.text.trim();
-      String meaning = _meaningController.text.trim();
-      if (word.isNotEmpty && meaning.isNotEmpty) {
-        // 데이터베이스에 단어와 의미를 추가하는 로직을 구현하세요.
-        // 예: await DatabaseHelper.instance.addWord(widget.category, word, meaning);
-
-        // 단어 추가 후 이전 화면으로 돌아갑니다.
-        Navigator.pop(context);
-      }
+  void _addNewWord() async {
+    String word = _wordController.text.trim();
+    String meaning = _meaningController.text.trim();
+    if (word.isEmpty || meaning.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('단어와 뜻을 모두 입력해주세요.'),
+        ),
+      );
+      return;
     }
+
+    try {
+      await DatabaseHelper.instance.addWord(word, meaning);
+      _refreshWords();
+      _wordController.clear();
+      _meaningController.clear();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$word 단어가 추가되었습니다.'),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('단어 추가에 실패했습니다. 오류: $e'),
+        ),
+      );
+    }
+  }
+
+  void _deleteWord(String word) async {
+    try {
+      await DatabaseHelper.instance.deleteWord(word);
+      _refreshWords();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$word 단어가 삭제되었습니다.'),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('단어 삭제에 실패했습니다. 오류: $e'),
+        ),
+      );
+    }
+  }
+
+  void _refreshWords() async {
+    List<Map<String, dynamic>> updatedWords = await DatabaseHelper.instance.getWords();
+    setState(() {
+      _words = updatedWords;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.category}에 단어 추가'),
+        title: Text('단어 추가/삭제'),
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              TextFormField(
-                controller: _wordController,
-                decoration: InputDecoration(
-                  labelText: '단어',
+      body: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: <Widget>[
+                TextField(
+                  controller: _wordController,
+                  decoration: InputDecoration(hintText: '단어를 입력하세요'),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '단어를 입력해주세요';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _meaningController,
-                decoration: InputDecoration(
-                  labelText: '의미',
+                TextField(
+                  controller: _meaningController,
+                  decoration: InputDecoration(hintText: '뜻을 입력하세요'),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '의미를 입력해주세요';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _saveWord,
-                child: Text('저장'),
-              ),
-            ],
+                SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _addNewWord,
+                  child: Text('단어 추가'),
+                ),
+              ],
+            ),
           ),
-        ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _words.length,
+              itemBuilder: (context, index) {
+                final word = _words[index];
+                return ListTile(
+                  title: Text(word['word']),
+                  subtitle: Text(word['meaning']),
+                  trailing: IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () => _deleteWord(word['word']),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshWords();
   }
 }
