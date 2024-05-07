@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+//import 'package:sqflite/sqflite.dart';
 import 'database_helper.dart'; // 'your_project_name'을 여러분의 프로젝트 이름으로 변경하세요.
 import 'CategorySelectionPage.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   // FFI용 SQLite 데이터베이스 팩토리를 초기화합니다.

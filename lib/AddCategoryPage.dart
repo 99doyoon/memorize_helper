@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'database_helper.dart';
 
 class AddCategoryPage extends StatefulWidget {
@@ -64,8 +65,12 @@ class _AddCategoryPageState extends State<AddCategoryPage> {
             TextField(
               controller: _categoryController,
               decoration: InputDecoration(
-                labelText: '카테고리 이름',
+                labelText: '카테고리 이름 (최대 100자)',
               ),
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(100), // 최대 100자로 제한
+              ],
+              maxLength: 100, // 최대 길이 표시
             ),
             SizedBox(height: 20),
             ElevatedButton(
